@@ -1,0 +1,143 @@
+function NotifyLineToday() {
+  var calendarId = "XXXXXXXXXXXXX"; // ID Calendar
+  var token = "XXXXXXXXXXXXXXXXX"; // Line Token 
+  var url = "https://notify-api.line.me/api/notify";
+  
+  var calendar = CalendarApp.getCalendarById(calendarId);
+  var today = new Date();
+  var event = calendar.getEventsForDay(today);
+  var msg = "";
+  
+  var properties = PropertiesService.getScriptProperties();
+  var lastEventIdsStr = properties.getProperty("lastEventIds");
+  var lastEventIds = lastEventIdsStr ? JSON.parse(lastEventIdsStr) : {};
+
+  if (event.length === 0) {
+    msg = "\nปฏิทินกิจกรรมกลุ่ม กพส. (วันนี้)\n" + formatDateToday(today) +"\n(ไม่พบกิจกรรม)";
+  } else {
+    msg += "\nปฏิทินกิจกรรมกลุ่ม กพส. (วันนี้)\n" + formatDateToday(today) + "\nมีทั้งหมด " + String(event.length) + " กิจกรรม ได้แก่";
+    msg += sendMessage(event);
+
+    event.forEach(function (event) {
+      var eventId = event.getId();
+      lastEventIds[eventId] = true;
+    });
+  }
+
+  properties.setProperty("lastEventIds", JSON.stringify(lastEventIds));
+
+  var jsonData = {
+    message: msg
+  }
+  var options =
+  {
+    "method": "post",
+    "contentType": "application/x-www-form-urlencoded",
+    "payload": jsonData,
+    "headers": { "Authorization": "Bearer " + token }
+  };
+  var res = UrlFetchApp.fetch(url, options);
+}
+
+function NotifyLineOnCalendarChanges() {
+  var calendarId = "XXXXXXXXXXXXXXX"; // ID Calendar
+  var token = "XXXXXXXXXXXXXXXXXXX"; // Line Token 
+  var url = "https://notify-api.line.me/api/notify";
+  
+  var calendar = CalendarApp.getCalendarById(calendarId);
+  var properties = PropertiesService.getScriptProperties();
+  var lastEventIdsStr = properties.getProperty("lastEventIds");
+  var lastEventIds = lastEventIdsStr ? JSON.parse(lastEventIdsStr) : {};
+  
+  var today = new Date();
+  var events = calendar.getEventsForDay(today);
+  var msg = "";
+  var addedEvents = [];
+  var editedEvents = [];
+
+  events.forEach(function (event) {
+    var eventId = event.getId();
+    var lastUpdatedTime = event.getLastUpdated().toISOString();
+
+    if (!(eventId in lastEventIds) || lastUpdatedTime > lastEventIds[eventId]) {
+      if (!(eventId in lastEventIds)) {
+        addedEvents.push(event);
+      } else {
+        editedEvents.push(event);
+      }
+
+      lastEventIds[eventId] = lastUpdatedTime;
+    }
+  });
+
+  if (addedEvents.length > 0) {
+    msg += "\n🔥มีการเพิ่มกิจกรรม (วันนี้)🔥\n"+ formatDateToday(today) +"\nโดยมีรายละเอียดดังนี้\n\n";
+    addedEvents.forEach(function (event) {
+      var title = event.getTitle();
+      var start = event.isAllDayEvent() ? "ทั้งวัน" : event.getStartTime().getHours() + ":" + ("0" + event.getStartTime().getMinutes()).slice(-2);
+      var end = event.isAllDayEvent() ? "" : " - " + event.getEndTime().getHours() + ":" + ("0" + event.getEndTime().getMinutes()).slice(-2) + " น.";
+      var description = event.getDescription();
+      var location = event.getLocation();
+
+      msg += "เรื่อง : " + title + "\nเวลา : " + start + end +  "\nรายละเอียด : " + description + "\nสถานที่ : " + location;
+    });
+  }
+
+  if (editedEvents.length > 0) {
+    msg += "\n🛠️มีการแก้ไขกิจกรรม (วันนี้)🛠️\n"+ formatDateToday(today) +"\nโดยมีรายละเอียดดังนี้\n\n";
+    editedEvents.forEach(function (event) {
+      var title = event.getTitle();
+      var start = event.isAllDayEvent() ? "ทั้งวัน" : event.getStartTime().getHours() + ":" + ("0" + event.getStartTime().getMinutes()).slice(-2);
+      var end = event.isAllDayEvent() ? "" : " - " + event.getEndTime().getHours() + ":" + ("0" + event.getEndTime().getMinutes()).slice(-2) + " น.";
+      var description = event.getDescription();
+      var location = event.getLocation();
+
+      msg += "เรื่อง : " + title + "\nเวลา : " + start + end +  "\nรายละเอียด : " + description + "\nสถานที่ : " + location;
+    });
+  }
+
+  if (addedEvents.length === 0 && editedEvents.length === 0) {
+    return;
+  }
+
+  properties.setProperty("lastEventIds", JSON.stringify(lastEventIds));
+  
+  var jsonData = {
+    message: msg
+  }
+  var options =
+  {
+    "method": "post",
+    "contentType": "application/x-www-form-urlencoded",
+    "payload": jsonData,
+    "headers": { "Authorization": "Bearer " + token }
+  };
+  var res = UrlFetchApp.fetch(url, options);
+}
+
+function sendMessage(events) {
+    var msg = "";
+  events.forEach(function (event, index) {
+    var title = event.getTitle();
+    var start = event.isAllDayEvent() ? "ทั้งวัน" : event.getStartTime().getHours() + ":" + ("0" + event.getStartTime().getMinutes()).slice(-2);
+    var end = event.isAllDayEvent() ? "" : " - " + event.getEndTime().getHours() + ":" + ("0" + event.getEndTime().getMinutes()).slice(-2) + " น.";
+    var description = event.getDescription();
+    var location = event.getLocation();
+    
+    msg += "\n\nกิจกรรมที่ " + (index + 1) + "\nเรื่อง : " + title + "\nเวลา : " + start + end + "\nรายละเอียด : " + description + "\nสถานที่ : " + location;
+  });
+  return msg;
+}
+
+function formatDateToday(date) {
+  var dayOfWeek = ["วันอาทิตย์", "วันจันทร์", "วันอังคาร", "วันพุธ", "วันพฤหัสบดี", "วันศุกร์", "วันเสาร์"];
+  var monthOfYear = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+  
+  var day = date.getDate();
+  var month = monthOfYear[date.getMonth()];
+  var year = date.getFullYear() + 543;
+  var dayIndex = date.getDay();
+  var dayName = dayOfWeek[dayIndex];
+  
+  return dayName + "ที่ " + day + " " + month + " " + year;
+}
