@@ -1,0 +1,55 @@
+function NotifyLineTomorrow() {
+  var calendar = CalendarApp.getCalendarById("XXXXXXXXXX"); //ID Calendar
+  var token = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"; // Line Token 
+  var url = "https://notify-api.line.me/api/notify";
+  
+  var tomorrow = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 1);
+  var event = calendar.getEventsForDay(tomorrow);
+  var msg = "";
+  
+  if (event.length === 0) {
+    msg = "\nปฏิทินกิจกรรมกลุ่ม กพส. (วันพรุ่งนี้)\n"+ formatDateTomorrow(tomorrow) +"\n(ไม่พบกิจกรรม)";
+  }
+  else {
+    msg += "\nปฏิทินกิจกรรมกลุ่ม กพส. (วันพรุ่งนี้)\n" + formatDateTomorrow(tomorrow) + "\nมีทั้งหมด " + String(event.length) + " กิจกรรม ได้แก่";
+    msg += sendMessageTomorrow(event);
+  }
+  var jsonData = {
+    message: msg
+  }
+  var options =
+  {
+    "method": "post",
+    "contentType": "application/x-www-form-urlencoded",
+    "payload": jsonData,
+    "headers": { "Authorization": "Bearer " + token }
+  };
+  var res = UrlFetchApp.fetch(url, options);
+}
+
+function sendMessageTomorrow(events) {
+  var msg = "";
+  events.forEach(function (event, index) {
+    var title = event.getTitle();
+    var start = event.isAllDayEvent() ? "ทั้งวัน" : event.getStartTime().getHours() + ":" + ("0" + event.getStartTime().getMinutes()).slice(-2);
+    var end = event.isAllDayEvent() ? "" : " - " + event.getEndTime().getHours() + ":" + ("0" + event.getEndTime().getMinutes()).slice(-2) + " น.";
+    var description = event.getDescription();
+    var location = event.getLocation();
+    
+    msg += "\n\nกิจกรรมที่ " + (index + 1) + "\nเวลา : " + start + end + "\nเรื่อง : " + title + "\nรายละเอียด : " + description + "\nสถานที่ : " + location;
+  });
+  return msg;
+}
+
+function formatDateTomorrow(date) {
+  var dayOfWeek = ["วันอาทิตย์", "วันจันทร์", "วันอังคาร", "วันพุธ", "วันพฤหัสบดี", "วันศุกร์", "วันเสาร์"];
+  var monthOfYear = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+  
+  var day = date.getDate();
+  var month = monthOfYear[date.getMonth()];
+  var year = date.getFullYear() + 543;
+  var dayIndex = date.getDay();
+  var dayName = dayOfWeek[dayIndex];
+  
+  return dayName + "ที่ " + day + " " + month + " " + year;
+}
